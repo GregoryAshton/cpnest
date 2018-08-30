@@ -1,0 +1,346 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>cpnest.sampler &mdash; CPNest 0.1.4 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> CPNest
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">CPNest</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>cpnest.sampler</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for cpnest.sampler</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">division</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">math</span> <span class="k">import</span> <span class="n">log</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="k">import</span> <span class="n">deque</span>
+<span class="kn">from</span> <span class="nn">random</span> <span class="k">import</span> <span class="n">random</span><span class="p">,</span><span class="n">randrange</span>
+
+<span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">parameter</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">proposal</span>
+
+<div class="viewcode-block" id="Sampler"><a class="viewcode-back" href="../../cpnest.html#cpnest.sampler.Sampler">[docs]</a><span class="k">class</span> <span class="nc">Sampler</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Sampler class.</span>
+<span class="sd">    Initialisation arguments:</span>
+<span class="sd">    </span>
+<span class="sd">    usermodel:</span>
+<span class="sd">    user defined model to sample</span>
+<span class="sd">    </span>
+<span class="sd">    maxmcmc:</span>
+<span class="sd">    maximum number of mcmc steps to be used in the sampler</span>
+<span class="sd">    </span>
+<span class="sd">    verbose:</span>
+<span class="sd">    display debug information on screen</span>
+<span class="sd">    default: False</span>
+<span class="sd">    </span>
+<span class="sd">    poolsize:</span>
+<span class="sd">    number of objects for the affine invariant sampling</span>
+<span class="sd">    default: 1000</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">usermodel</span><span class="p">,</span><span class="n">maxmcmc</span><span class="p">,</span><span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">poolsize</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">user</span> <span class="o">=</span> <span class="n">usermodel</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">maxmcmc</span> <span class="o">=</span> <span class="n">maxmcmc</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Nmcmc</span> <span class="o">=</span> <span class="n">maxmcmc</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Nmcmc_exact</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">maxmcmc</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">proposals</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">DefaultProposalCycle</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">poolsize</span> <span class="o">=</span> <span class="n">poolsize</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">evolution_points</span> <span class="o">=</span> <span class="n">deque</span><span class="p">(</span><span class="n">maxlen</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">poolsize</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="c1"># +1 for the point to evolve</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">acceptance</span><span class="o">=</span><span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">initialised</span><span class="o">=</span><span class="kc">False</span>
+        
+<div class="viewcode-block" id="Sampler.reset"><a class="viewcode-back" href="../../cpnest.html#cpnest.sampler.Sampler.reset">[docs]</a>    <span class="k">def</span> <span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialise the sampler</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">poolsize</span><span class="p">):</span>
+          <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span> <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;process </span><span class="si">{0!s}</span><span class="s2"> --&gt; generating pool of </span><span class="si">{1:d}</span><span class="s2"> points for evolution --&gt; </span><span class="si">{2:.0f}</span><span class="s2"> </span><span class="si">% c</span><span class="s2">omplete</span><span class="se">\r</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">poolsize</span><span class="p">,</span> <span class="mf">100.0</span><span class="o">*</span><span class="nb">float</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">poolsize</span><span class="p">)))</span>
+            <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">new_point</span><span class="p">()</span>
+            <span class="n">p</span><span class="o">.</span><span class="n">logP</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">log_prior</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">logP</span><span class="p">):</span> <span class="k">break</span>
+          <span class="n">p</span><span class="o">.</span><span class="n">logL</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">log_likelihood</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+          <span class="bp">self</span><span class="o">.</span><span class="n">evolution_points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span> <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">proposals</span><span class="o">.</span><span class="n">set_ensemble</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">evolution_points</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">evolution_points</span><span class="p">)):</span>
+          <span class="n">s</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">evolution_points</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span>
+          <span class="n">s</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">metropolis_hastings</span><span class="p">(</span><span class="n">s</span><span class="p">,</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">)</span>
+          <span class="bp">self</span><span class="o">.</span><span class="n">evolution_points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">proposals</span><span class="o">.</span><span class="n">set_ensemble</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">evolution_points</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">initialised</span><span class="o">=</span><span class="kc">True</span></div>
+
+<div class="viewcode-block" id="Sampler.estimate_nmcmc"><a class="viewcode-back" href="../../cpnest.html#cpnest.sampler.Sampler.estimate_nmcmc">[docs]</a>    <span class="k">def</span> <span class="nf">estimate_nmcmc</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">safety</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">tau</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Estimate autocorrelation length of chain using acceptance fraction</span>
+<span class="sd">        ACL = (2/acc) - 1</span>
+<span class="sd">        multiplied by a safety margin of 5</span>
+<span class="sd">        Uses moving average with decay time tau iterations (default: self.poolsize)</span>
+<span class="sd">        Taken from W. Farr&#39;s github.com/farr/Ensemble.jl</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">tau</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> <span class="n">tau</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">poolsize</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">acceptance</span> <span class="o">==</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Nmcmc_exact</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="mf">1.0</span><span class="o">/</span><span class="n">tau</span><span class="p">)</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">Nmcmc_exact</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Nmcmc_exact</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="mf">1.0</span><span class="o">/</span><span class="n">tau</span><span class="p">)</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">Nmcmc_exact</span> <span class="o">+</span> <span class="p">(</span><span class="n">safety</span><span class="o">/</span><span class="n">tau</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="mf">2.0</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">acceptance</span> <span class="o">-</span> <span class="mf">1.0</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Nmcmc_exact</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Nmcmc</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">safety</span><span class="p">,</span><span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">maxmcmc</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Nmcmc_exact</span><span class="p">))))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Nmcmc</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">safety</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">maxmcmc</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">Nmcmc</span></div>
+
+<div class="viewcode-block" id="Sampler.produce_sample"><a class="viewcode-back" href="../../cpnest.html#cpnest.sampler.Sampler.produce_sample">[docs]</a>    <span class="k">def</span> <span class="nf">produce_sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">queue</span><span class="p">,</span> <span class="n">logLmin</span><span class="p">,</span> <span class="n">seed</span><span class="p">,</span> <span class="n">ip</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="n">authkey</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        main loop that generates samples and puts them in the queue for the nested sampler object</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">initialised</span><span class="p">:</span>
+          <span class="bp">self</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+        <span class="c1"># Prevent process from zombification if consumer thread exits</span>
+        <span class="n">queue</span><span class="o">.</span><span class="n">cancel_join_thread</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">seed</span> <span class="o">=</span> <span class="n">seed</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">seed</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">counter</span><span class="o">=</span><span class="mi">0</span>
+        <span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+            <span class="c1"># Pick a random point from the ensemble to start with</span>
+            <span class="c1"># Pop it out the stack to prevent cloning</span>
+            <span class="c1">#param = self.evolution_points.rotate()</span>
+
+            <span class="n">param</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">evolution_points</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">poolsize</span><span class="p">)]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">evolution_points</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">param</span><span class="p">)</span>
+            
+            <span class="k">if</span> <span class="n">logLmin</span><span class="o">.</span><span class="n">value</span><span class="o">==</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">:</span>
+                <span class="k">break</span>
+            
+            <span class="n">outParam</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">metropolis_hastings</span><span class="p">(</span><span class="n">param</span><span class="p">,</span><span class="n">logLmin</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+            <span class="c1"># If we bailed out then flag point as unusable</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">acceptance</span><span class="o">==</span><span class="mf">0.0</span><span class="p">:</span>
+                <span class="n">outParam</span><span class="o">.</span><span class="n">logL</span><span class="o">=-</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span>
+           
+            <span class="c1"># Put sample back in the stack</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">evolution_points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">outParam</span><span class="o">.</span><span class="n">copy</span><span class="p">())</span>
+            <span class="c1"># Push the sample onto the queue</span>
+            <span class="n">queue</span><span class="o">.</span><span class="n">put</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">acceptance</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">Nmcmc</span><span class="p">,</span><span class="n">outParam</span><span class="p">))</span>
+            <span class="c1"># Update the ensemble every now and again</span>
+            <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">counter</span><span class="o">%</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">poolsize</span><span class="o">/</span><span class="mi">10</span><span class="p">))</span><span class="o">==</span><span class="mi">0</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">acceptance</span><span class="o">&lt;</span><span class="mf">0.001</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">proposals</span><span class="o">.</span><span class="n">set_ensemble</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">evolution_points</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">counter</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;Sampler process </span><span class="si">{0!s}</span><span class="s2">, exiting</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()))</span>
+        <span class="k">return</span> <span class="mi">0</span></div>
+
+<div class="viewcode-block" id="Sampler.metropolis_hastings"><a class="viewcode-back" href="../../cpnest.html#cpnest.sampler.Sampler.metropolis_hastings">[docs]</a>    <span class="k">def</span> <span class="nf">metropolis_hastings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">inParam</span><span class="p">,</span><span class="n">logLmin</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        metropolis-hastings loop to generate the new live point taking nmcmc steps</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">accepted</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">oldparam</span> <span class="o">=</span> <span class="n">inParam</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">logp_old</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">log_prior</span><span class="p">(</span><span class="n">oldparam</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">jumps</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Nmcmc</span><span class="p">):</span>
+            <span class="n">newparam</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">proposals</span><span class="o">.</span><span class="n">get_sample</span><span class="p">(</span><span class="n">oldparam</span><span class="o">.</span><span class="n">copy</span><span class="p">())</span>
+            <span class="n">newparam</span><span class="o">.</span><span class="n">logP</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">log_prior</span><span class="p">(</span><span class="n">newparam</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">newparam</span><span class="o">.</span><span class="n">logP</span><span class="o">-</span><span class="n">logp_old</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">proposals</span><span class="o">.</span><span class="n">log_J</span> <span class="o">&gt;</span> <span class="n">log</span><span class="p">(</span><span class="n">random</span><span class="p">()):</span>
+                <span class="n">newparam</span><span class="o">.</span><span class="n">logL</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">log_likelihood</span><span class="p">(</span><span class="n">newparam</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">newparam</span><span class="o">.</span><span class="n">logL</span> <span class="o">&gt;</span> <span class="n">logLmin</span><span class="p">:</span>
+                  <span class="n">oldparam</span> <span class="o">=</span> <span class="n">newparam</span>
+                  <span class="n">logp_old</span> <span class="o">=</span> <span class="n">newparam</span><span class="o">.</span><span class="n">logP</span>
+                  <span class="n">accepted</span><span class="o">+=</span><span class="mi">1</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">acceptance</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">accepted</span><span class="p">)</span><span class="o">/</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Nmcmc</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">estimate_nmcmc</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">oldparam</span></div></div>
+
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, W. Del Pozzo, J. Veitch.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'0.1.4',
+            LANGUAGE:'None',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

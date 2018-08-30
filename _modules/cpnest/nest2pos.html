@@ -1,0 +1,325 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>cpnest.nest2pos &mdash; CPNest 0.1.4 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> CPNest
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">CPNest</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>cpnest.nest2pos</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for cpnest.nest2pos</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">numpy</span> <span class="k">import</span> <span class="n">logaddexp</span><span class="p">,</span> <span class="n">vstack</span>
+<span class="kn">from</span> <span class="nn">numpy.random</span> <span class="k">import</span> <span class="n">uniform</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">reduce</span>
+
+<div class="viewcode-block" id="logsubexp"><a class="viewcode-back" href="../../cpnest.html#cpnest.nest2pos.logsubexp">[docs]</a><span class="k">def</span> <span class="nf">logsubexp</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">x</span> <span class="o">&gt;=</span> <span class="n">y</span><span class="p">),</span> <span class="s1">&#39;cannot take log of negative number </span><span class="si">{0!s}</span><span class="s1"> - </span><span class="si">{1!s}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">y</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">x</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">log1p</span><span class="p">(</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">y</span><span class="o">-</span><span class="n">x</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="log_integrate_log_trap"><a class="viewcode-back" href="../../cpnest.html#cpnest.nest2pos.log_integrate_log_trap">[docs]</a><span class="k">def</span> <span class="nf">log_integrate_log_trap</span><span class="p">(</span><span class="n">log_func</span><span class="p">,</span><span class="n">log_support</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Trapezoidal integration of given log(func)</span>
+<span class="sd">    Returns log of the integral</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">log_func_sum</span> <span class="o">=</span> <span class="n">logaddexp</span><span class="p">(</span><span class="n">log_func</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">log_func</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">log_dxs</span> <span class="o">=</span> <span class="n">logsubexp</span><span class="p">(</span><span class="n">log_support</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">log_support</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+
+    <span class="k">return</span> <span class="n">logaddexp</span><span class="o">.</span><span class="n">reduce</span><span class="p">(</span><span class="n">log_func_sum</span> <span class="o">+</span> <span class="n">log_dxs</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="compute_weights"><a class="viewcode-back" href="../../cpnest.html#cpnest.nest2pos.compute_weights">[docs]</a><span class="k">def</span> <span class="nf">compute_weights</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">Nlive</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Returns log_ev, log_wts for the log-likelihood samples in data,</span>
+<span class="sd">    assumed to be a result of nested sampling with Nlive live points.&quot;&quot;&quot;</span>
+
+    <span class="n">start_data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(([</span><span class="nb">float</span><span class="p">(</span><span class="s1">&#39;-inf&#39;</span><span class="p">)],</span> <span class="n">data</span><span class="p">[:</span><span class="o">-</span><span class="n">Nlive</span><span class="p">]))</span>
+    <span class="n">end_data</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="o">-</span><span class="n">Nlive</span><span class="p">:]</span>
+
+    <span class="n">log_wts</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+    <span class="n">log_vols_start</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">start_data</span><span class="p">)</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">log1p</span><span class="p">(</span><span class="o">-</span><span class="mf">1.</span><span class="o">/</span><span class="n">Nlive</span><span class="p">))</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">log1p</span><span class="p">(</span><span class="o">-</span><span class="mf">1.</span><span class="o">/</span><span class="n">Nlive</span><span class="p">)</span>
+    <span class="n">log_vols_end</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">end_data</span><span class="p">))</span>
+    <span class="n">log_vols_end</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">NINF</span>
+    <span class="n">log_vols_end</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">=</span><span class="n">log_vols_start</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="n">np</span><span class="o">.</span><span class="n">log1p</span><span class="p">(</span><span class="o">-</span><span class="mf">1.0</span><span class="o">/</span><span class="n">Nlive</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">end_data</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">log_vols_end</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">=</span><span class="n">log_vols_end</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">+</span><span class="n">np</span><span class="o">.</span><span class="n">log1p</span><span class="p">(</span><span class="o">-</span><span class="mf">1.0</span><span class="o">/</span><span class="p">(</span><span class="n">Nlive</span><span class="o">-</span><span class="n">i</span><span class="p">))</span>
+
+    <span class="n">log_likes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">((</span><span class="n">start_data</span><span class="p">,</span><span class="n">end_data</span><span class="p">,[</span><span class="n">end_data</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]]))</span>
+
+    <span class="n">log_vols</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">((</span><span class="n">log_vols_start</span><span class="p">,</span><span class="n">log_vols_end</span><span class="p">))</span>
+    <span class="n">log_ev</span> <span class="o">=</span> <span class="n">log_integrate_log_trap</span><span class="p">(</span><span class="n">log_likes</span><span class="p">,</span> <span class="n">log_vols</span><span class="p">)</span>
+
+    <span class="n">log_dXs</span> <span class="o">=</span> <span class="n">logsubexp</span><span class="p">(</span><span class="n">log_vols</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">log_vols</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+    <span class="n">log_wts</span> <span class="o">=</span> <span class="n">log_likes</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">log_dXs</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="n">log_wts</span> <span class="o">-=</span> <span class="n">log_ev</span>
+
+    <span class="k">return</span> <span class="n">log_ev</span><span class="p">,</span> <span class="n">log_wts</span></div>
+
+<div class="viewcode-block" id="draw_posterior"><a class="viewcode-back" href="../../cpnest.html#cpnest.nest2pos.draw_posterior">[docs]</a><span class="k">def</span> <span class="nf">draw_posterior</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">log_wts</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Draw points from the given data (of shape (Nsamples, Ndim))</span>
+<span class="sd">    with associated log(weight) (of shape (Nsamples,)). Draws uniquely so</span>
+<span class="sd">    there are no repeated samples&quot;&quot;&quot;</span>
+    <span class="n">maxWt</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="n">log_wts</span><span class="p">)</span>
+    <span class="n">normalised_wts</span><span class="o">=</span><span class="n">log_wts</span><span class="o">-</span><span class="n">maxWt</span>
+    <span class="n">selection</span><span class="o">=</span><span class="p">[</span><span class="n">n</span> <span class="o">&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">uniform</span><span class="p">())</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">normalised_wts</span><span class="p">]</span>
+    <span class="n">idx</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">filter</span><span class="p">(</span><span class="k">lambda</span> <span class="n">i</span><span class="p">:</span> <span class="n">selection</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">selection</span><span class="p">))))</span>
+    <span class="k">return</span> <span class="n">data</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span></div>
+    
+<div class="viewcode-block" id="draw_posterior_many"><a class="viewcode-back" href="../../cpnest.html#cpnest.nest2pos.draw_posterior_many">[docs]</a><span class="k">def</span> <span class="nf">draw_posterior_many</span><span class="p">(</span><span class="n">datas</span><span class="p">,</span> <span class="n">Nlives</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Draw samples from the posteriors represented by the</span>
+<span class="sd">    (Nruns, Nsamples, Nparams)-shaped array datas, each sampled with</span>
+<span class="sd">    the corresponding Nlive number of live points. Will draw without repetition,</span>
+<span class="sd">    and weight according to the evidence in each input run&quot;&quot;&quot;</span>
+    <span class="c1"># list of log_evidences, log_weights</span>
+    <span class="n">log_evs</span><span class="p">,</span><span class="n">log_wts</span><span class="o">=</span><span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">compute_weights</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;logL&#39;</span><span class="p">],</span><span class="n">Nlive</span><span class="p">)</span> <span class="k">for</span> <span class="n">data</span><span class="p">,</span><span class="n">Nlive</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">datas</span><span class="p">,</span> <span class="n">Nlives</span><span class="p">)])</span>
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Computed log_evidences: </span><span class="si">{0!s}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">((</span><span class="nb">str</span><span class="p">(</span><span class="n">log_evs</span><span class="p">))))</span>
+
+    <span class="n">log_total_evidence</span><span class="o">=</span><span class="n">reduce</span><span class="p">(</span><span class="n">logaddexp</span><span class="p">,</span> <span class="n">log_evs</span><span class="p">)</span>
+    <span class="n">log_max_evidence</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="n">log_evs</span><span class="p">)</span>
+    <span class="c1">#print &#39;evidences: %s&#39;%(str(log_evs))</span>
+    <span class="n">fracs</span><span class="o">=</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">log_ev</span><span class="o">-</span><span class="n">log_max_evidence</span><span class="p">)</span> <span class="k">for</span> <span class="n">log_ev</span> <span class="ow">in</span> <span class="n">log_evs</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Relative weights of input files: </span><span class="si">{0!s}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">((</span><span class="nb">str</span><span class="p">(</span><span class="n">fracs</span><span class="p">))))</span>
+    <span class="n">Ns</span><span class="o">=</span><span class="p">[</span><span class="n">fracs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">/</span><span class="nb">len</span><span class="p">(</span><span class="n">datas</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">fracs</span><span class="p">))]</span>
+    <span class="n">Ntot</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="n">Ns</span><span class="p">)</span>
+    <span class="n">fracs</span><span class="o">=</span><span class="p">[</span><span class="n">n</span><span class="o">/</span><span class="n">Ntot</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">Ns</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Relative weights of input files taking into account their length: </span><span class="si">{0!s}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">((</span><span class="nb">str</span><span class="p">(</span><span class="n">fracs</span><span class="p">))))</span>
+
+    <span class="n">posts</span><span class="o">=</span><span class="p">[</span><span class="n">draw_posterior</span><span class="p">(</span><span class="n">data</span><span class="p">,</span><span class="n">logwt</span><span class="p">)</span> <span class="k">for</span> <span class="p">(</span><span class="n">data</span><span class="p">,</span><span class="n">logwt</span><span class="p">,</span><span class="n">logZ</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">datas</span><span class="p">,</span><span class="n">log_wts</span><span class="p">,</span><span class="n">log_evs</span><span class="p">)]</span>
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Number of input samples: </span><span class="si">{0!s}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">((</span><span class="nb">str</span><span class="p">([</span><span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">log_wts</span><span class="p">]))))</span>
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Expected number of samples from each input file </span><span class="si">{0!s}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">((</span><span class="nb">str</span><span class="p">([</span><span class="nb">int</span><span class="p">(</span><span class="n">f</span><span class="o">*</span><span class="nb">len</span><span class="p">(</span><span class="n">p</span><span class="p">))</span> <span class="k">for</span> <span class="n">f</span><span class="p">,</span><span class="n">p</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">fracs</span><span class="p">,</span><span class="n">posts</span><span class="p">)]))))</span>
+    <span class="n">bigpos</span><span class="o">=</span><span class="p">[]</span>
+    <span class="k">for</span> <span class="n">post</span><span class="p">,</span><span class="n">frac</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">posts</span><span class="p">,</span><span class="n">fracs</span><span class="p">):</span>
+      <span class="n">mask</span> <span class="o">=</span> <span class="n">uniform</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">post</span><span class="p">))</span><span class="o">&lt;</span><span class="n">frac</span>
+      <span class="n">bigpos</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">post</span><span class="p">[</span><span class="n">mask</span><span class="p">])</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">vstack</span><span class="p">(</span><span class="n">bigpos</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Samples produced: </span><span class="si">{0:d}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+    
+<div class="viewcode-block" id="draw_N_posterior"><a class="viewcode-back" href="../../cpnest.html#cpnest.nest2pos.draw_N_posterior">[docs]</a><span class="k">def</span> <span class="nf">draw_N_posterior</span><span class="p">(</span><span class="n">data</span><span class="p">,</span><span class="n">log_wts</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Draw N samples from the input data, weighted by log_wt.</span>
+<span class="sd">    For large N there may be repeated samples</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span><span class="p">(</span><span class="n">N</span><span class="o">==</span><span class="mi">0</span><span class="p">):</span> <span class="k">return</span> <span class="p">[]</span>
+    <span class="n">log_cumsums</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">log_wts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">log_cumsums</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">=-</span><span class="nb">float</span><span class="p">(</span><span class="s1">&#39;inf&#39;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span><span class="n">log_wt</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">log_wts</span><span class="p">):</span>
+        <span class="n">log_cumsums</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">=</span><span class="n">logaddexp</span><span class="p">(</span><span class="n">log_cumsums</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">log_wt</span><span class="p">)</span>
+
+    <span class="n">us</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">uniform</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="n">N</span><span class="p">))</span>
+    <span class="n">idxs</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">digitize</span><span class="p">(</span><span class="n">us</span><span class="p">,</span> <span class="n">log_cumsums</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">data</span><span class="p">[</span><span class="n">idxs</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="draw_N_posterior_many"><a class="viewcode-back" href="../../cpnest.html#cpnest.nest2pos.draw_N_posterior_many">[docs]</a><span class="k">def</span> <span class="nf">draw_N_posterior_many</span><span class="p">(</span><span class="n">datas</span><span class="p">,</span> <span class="n">Nlives</span><span class="p">,</span> <span class="n">Npost</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Draw Npost samples from the posteriors represented by the</span>
+<span class="sd">    (Nruns, Nsamples, Nparams)-shaped array datas, each sampled with</span>
+<span class="sd">    the corresponding number of live points Nlive. The returned number</span>
+<span class="sd">    of samples may not be exactly Npost due to rounding</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># get log_evidences, log_weights.</span>
+    <span class="n">log_evs</span><span class="p">,</span><span class="n">log_wts</span><span class="o">=</span><span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">compute_weights</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;logL&#39;</span><span class="p">],</span><span class="n">Nlive</span><span class="p">)</span> <span class="k">for</span> <span class="n">data</span><span class="p">,</span><span class="n">Nlive</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">datas</span><span class="p">,</span> <span class="n">Nlives</span><span class="p">)])</span>
+    
+    <span class="n">log_total_evidence</span><span class="o">=</span><span class="n">reduce</span><span class="p">(</span><span class="n">logaddexp</span><span class="p">,</span> <span class="n">log_evs</span><span class="p">)</span>
+    <span class="n">Ns</span><span class="o">=</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">Npost</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">log_ev</span><span class="o">-</span><span class="n">log_total_evidence</span><span class="p">)))</span> <span class="k">for</span> <span class="n">log_ev</span> <span class="ow">in</span> <span class="n">log_evs</span><span class="p">]</span>
+    <span class="n">posts</span><span class="o">=</span><span class="p">[</span><span class="n">draw_N_posterior</span><span class="p">(</span><span class="n">data</span><span class="p">,</span><span class="n">logwt</span><span class="p">,</span><span class="n">N</span><span class="p">)</span> <span class="k">for</span> <span class="p">(</span><span class="n">data</span><span class="p">,</span><span class="n">logwt</span><span class="p">,</span><span class="n">N</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">datas</span><span class="p">,</span><span class="n">log_wts</span><span class="p">,</span><span class="n">Ns</span><span class="p">)]</span>
+    <span class="k">return</span> <span class="n">vstack</span><span class="p">(</span><span class="n">posts</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, W. Del Pozzo, J. Veitch.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'0.1.4',
+            LANGUAGE:'None',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

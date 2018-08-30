@@ -1,0 +1,481 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>cpnest.NestedSampling &mdash; CPNest 0.1.4 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> CPNest
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">CPNest</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>cpnest.NestedSampling</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for cpnest.NestedSampling</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">division</span><span class="p">,</span> <span class="n">print_function</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">multiprocessing</span> <span class="k">as</span> <span class="nn">mp</span>
+<span class="kn">from</span> <span class="nn">multiprocessing</span> <span class="k">import</span> <span class="n">Lock</span>
+<span class="kn">from</span> <span class="nn">numpy</span> <span class="k">import</span> <span class="n">logaddexp</span><span class="p">,</span> <span class="n">exp</span>
+<span class="kn">from</span> <span class="nn">numpy</span> <span class="k">import</span> <span class="n">inf</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">queue</span> <span class="k">import</span> <span class="n">Empty</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">Queue</span> <span class="k">import</span> <span class="n">Empty</span> <span class="c1"># For python 2 compatibility</span>
+<span class="kn">from</span> <span class="nn">multiprocessing.sharedctypes</span> <span class="k">import</span> <span class="n">Value</span>
+<span class="kn">from</span> <span class="nn">ctypes</span> <span class="k">import</span> <span class="n">c_int</span><span class="p">,</span> <span class="n">c_double</span>
+<span class="kn">import</span> <span class="nn">types</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">nest2pos</span>
+<span class="kn">from</span> <span class="nn">.nest2pos</span> <span class="k">import</span> <span class="n">logsubexp</span>
+<span class="kn">from</span> <span class="nn">operator</span> <span class="k">import</span> <span class="n">attrgetter</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">copyreg</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">copy_reg</span> <span class="k">as</span> <span class="nn">copyreg</span>
+
+
+<span class="k">def</span> <span class="nf">_pickle_method</span><span class="p">(</span><span class="n">m</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">m</span><span class="o">.</span><span class="n">im_self</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">,</span> <span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">im_class</span><span class="p">,</span> <span class="n">m</span><span class="o">.</span><span class="n">im_func</span><span class="o">.</span><span class="n">func_name</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">,</span> <span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">im_self</span><span class="p">,</span> <span class="n">m</span><span class="o">.</span><span class="n">im_func</span><span class="o">.</span><span class="n">func_name</span><span class="p">)</span>
+
+<span class="n">copyreg</span><span class="o">.</span><span class="n">pickle</span><span class="p">(</span><span class="n">types</span><span class="o">.</span><span class="n">MethodType</span><span class="p">,</span> <span class="n">_pickle_method</span><span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">_NSintegralState</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+  <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">  Stores the state of the nested sampling integrator</span>
+<span class="sd">  &quot;&quot;&quot;</span>
+  <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">nlive</span><span class="p">):</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">nlive</span><span class="o">=</span><span class="n">nlive</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+  <span class="k">def</span> <span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Reset the sampler</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">iteration</span><span class="o">=</span><span class="mi">0</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">logZ</span><span class="o">=-</span><span class="n">inf</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">oldZ</span><span class="o">=-</span><span class="n">inf</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">logw</span><span class="o">=</span><span class="mi">0</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="o">=</span><span class="mi">0</span>
+    <span class="c1"># Start with a dummy sample enclosing the whole prior</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">logLs</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="n">inf</span><span class="p">]</span> <span class="c1"># Likelihoods sampled</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">log_vols</span><span class="o">=</span><span class="p">[</span><span class="mf">0.0</span><span class="p">]</span> <span class="c1"># Volumes enclosed by contours</span>
+  <span class="k">def</span> <span class="nf">increment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">logL</span><span class="p">,</span><span class="n">nlive</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Increment the state of the evidence integrator</span>
+<span class="sd">    Simply uses rectangle rule for initial estimate</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span><span class="p">(</span><span class="n">logL</span><span class="o">&lt;=</span><span class="bp">self</span><span class="o">.</span><span class="n">logLs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]):</span>
+      <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;WARNING: NS integrator received non-monotonic logL. </span><span class="si">{0:.3f}</span><span class="s1"> -&gt; </span><span class="si">{1:.3f}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">logLs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span><span class="n">logL</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">nlive</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+      <span class="n">nlive</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nlive</span>
+    <span class="n">oldZ</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">logZ</span>
+    <span class="n">logt</span><span class="o">=-</span><span class="mf">1.0</span><span class="o">/</span><span class="n">nlive</span>
+    <span class="n">Wt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">logw</span> <span class="o">+</span> <span class="n">logL</span> <span class="o">+</span> <span class="n">logsubexp</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="n">logt</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">logZ</span> <span class="o">=</span> <span class="n">logaddexp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">logZ</span><span class="p">,</span><span class="n">Wt</span><span class="p">)</span>
+    <span class="c1"># Update information estimate</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">oldZ</span><span class="p">)</span> <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">logZ</span><span class="p">):</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">info</span> <span class="o">=</span> <span class="n">exp</span><span class="p">(</span><span class="n">Wt</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">logZ</span><span class="p">)</span><span class="o">*</span><span class="n">logL</span> <span class="o">+</span> <span class="n">exp</span><span class="p">(</span><span class="n">oldZ</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">logZ</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">info</span> <span class="o">+</span> <span class="n">oldZ</span><span class="p">)</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">logZ</span>
+    
+    <span class="c1"># Update history</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">logw</span> <span class="o">+=</span> <span class="n">logt</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">iteration</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">logLs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">logL</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">log_vols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">logw</span><span class="p">)</span>
+  <span class="k">def</span> <span class="nf">finalise</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the final evidence with more accurate integrator</span>
+<span class="sd">    Call at end of sampling run to refine estimate</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">scipy</span> <span class="k">import</span> <span class="n">integrate</span>
+    <span class="c1"># Trapezoidal rule</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">logZ</span><span class="o">=</span><span class="n">nest2pos</span><span class="o">.</span><span class="n">log_integrate_log_trap</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">logLs</span><span class="p">),</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">log_vols</span><span class="p">))</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">logZ</span>
+  <span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">filename</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Plot the logX vs logL</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">matplotlib</span> <span class="k">as</span> <span class="nn">mpl</span>
+    <span class="n">mpl</span><span class="o">.</span><span class="n">use</span><span class="p">(</span><span class="s1">&#39;Agg&#39;</span><span class="p">)</span>
+    <span class="kn">from</span> <span class="nn">matplotlib</span> <span class="k">import</span> <span class="n">pyplot</span> <span class="k">as</span> <span class="n">plt</span>
+    <span class="n">fig</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">log_vols</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">logLs</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0}</span><span class="s1"> iterations. logZ=</span><span class="si">{1:.2f}</span><span class="s1"> H=</span><span class="si">{2:.2f}</span><span class="s1"> bits&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">iteration</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">logZ</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">e</span><span class="p">)))</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="n">which</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;log prior_volume&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;log likelihood&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xlim</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">log_vols</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span><span class="bp">self</span><span class="o">.</span><span class="n">log_vols</span><span class="p">[</span><span class="mi">0</span><span class="p">]])</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Saved nested sampling plot as </span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">filename</span><span class="p">))</span>
+    
+
+<div class="viewcode-block" id="NestedSampler"><a class="viewcode-back" href="../../cpnest.html#cpnest.NestedSampling.NestedSampler">[docs]</a><span class="k">class</span> <span class="nc">NestedSampler</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Nested Sampler class.</span>
+<span class="sd">    Initialisation arguments:</span>
+<span class="sd">    </span>
+<span class="sd">    Nlive: </span>
+<span class="sd">        number of live points to be used for the integration</span>
+<span class="sd">        default: 1024</span>
+<span class="sd">    </span>
+<span class="sd">    maxmcmc: </span>
+<span class="sd">        maximum number of mcmc steps to be used in the sampler</span>
+<span class="sd">        default: 4096</span>
+<span class="sd">    </span>
+<span class="sd">    output: </span>
+<span class="sd">        folder where the output will be stored</span>
+<span class="sd">    </span>
+<span class="sd">    verbose: Verbosity level</span>
+<span class="sd">	0: Nothing</span>
+<span class="sd">        1: display information on screen</span>
+<span class="sd">        2: (1) + diagnostic plots</span>
+<span class="sd">        </span>
+<span class="sd">    seed:</span>
+<span class="sd">        seed for the initialisation of the pseudorandom chain</span>
+<span class="sd">    </span>
+<span class="sd">    prior_sampling:</span>
+<span class="sd">        produce Nlive samples from the prior</span>
+<span class="sd">        </span>
+<span class="sd">    stopping:</span>
+<span class="sd">	Stop when remaining samples wouldn&#39;t change logZ estimate by this much</span>
+<span class="sd">        </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">usermodel</span><span class="p">,</span><span class="n">Nlive</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span><span class="n">maxmcmc</span><span class="o">=</span><span class="mi">4096</span><span class="p">,</span><span class="n">output</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">verbose</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">seed</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">prior_sampling</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">stopping</span><span class="o">=</span><span class="mf">0.1</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialise all necessary arguments and variables for the algorithm</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">=</span><span class="n">usermodel</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prior_sampling</span> <span class="o">=</span> <span class="n">prior_sampling</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">setup_random_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span> <span class="o">=</span> <span class="n">verbose</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">accepted</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rejected</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">queue_counter</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Nlive</span> <span class="o">=</span> <span class="n">Nlive</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Nmcmc</span> <span class="o">=</span> <span class="n">maxmcmc</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">maxmcmc</span> <span class="o">=</span> <span class="n">maxmcmc</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">params</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">Nlive</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tolerance</span> <span class="o">=</span> <span class="n">stopping</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">condition</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">worst</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logLmax</span> <span class="o">=</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">iteration</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">nested_samples</span><span class="o">=</span><span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logZ</span><span class="o">=</span><span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">state</span> <span class="o">=</span> <span class="n">_NSintegralState</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Nlive</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_folder</span> <span class="o">=</span> <span class="n">output</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">evidence_out</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">checkpoint</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">setup_output</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
+        <span class="n">header</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output</span><span class="p">,</span><span class="s1">&#39;header.txt&#39;</span><span class="p">),</span><span class="s1">&#39;w&#39;</span><span class="p">)</span>
+        <span class="n">header</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\t</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">names</span><span class="p">))</span>
+        <span class="n">header</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\t</span><span class="s1">logL</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">header</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logLmin</span> <span class="o">=</span> <span class="n">Value</span><span class="p">(</span><span class="n">c_double</span><span class="p">,</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span><span class="n">lock</span><span class="o">=</span><span class="n">Lock</span><span class="p">())</span>
+
+<div class="viewcode-block" id="NestedSampler.setup_output"><a class="viewcode-back" href="../../cpnest.html#cpnest.NestedSampling.NestedSampler.setup_output">[docs]</a>    <span class="k">def</span> <span class="nf">setup_output</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">output</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set up the output folder</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">system</span><span class="p">(</span><span class="s2">&quot;mkdir -p </span><span class="si">{0!s}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">output</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">outfilename</span> <span class="o">=</span> <span class="s2">&quot;chain_&quot;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Nlive</span><span class="p">)</span><span class="o">+</span><span class="s2">&quot;_&quot;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">seed</span><span class="p">)</span><span class="o">+</span><span class="s2">&quot;.txt&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">outputfile</span><span class="o">=</span><span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">outfilename</span><span class="p">),</span><span class="s2">&quot;w&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">outputfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:s}</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">header</span><span class="p">()</span><span class="o">.</span><span class="n">rstrip</span><span class="p">()))</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">outputfile</span><span class="p">,</span><span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">outfilename</span><span class="o">+</span><span class="s2">&quot;_evidence.txt&quot;</span><span class="p">),</span> <span class="s2">&quot;w&quot;</span> <span class="p">),</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">outfilename</span><span class="o">+</span><span class="s2">&quot;_resume&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="NestedSampler.output_sample"><a class="viewcode-back" href="../../cpnest.html#cpnest.NestedSampling.NestedSampler.output_sample">[docs]</a>    <span class="k">def</span> <span class="nf">output_sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">sample</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">outputfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:s}</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">strsample</span><span class="p">(</span><span class="n">sample</span><span class="p">)</span><span class="o">.</span><span class="n">rstrip</span><span class="p">()))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">nested_samples</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sample</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="NestedSampler.setup_random_seed"><a class="viewcode-back" href="../../cpnest.html#cpnest.NestedSampling.NestedSampler.setup_random_seed">[docs]</a>    <span class="k">def</span> <span class="nf">setup_random_seed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">seed</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        initialise the random seed</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">seed</span> <span class="o">=</span> <span class="n">seed</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">seed</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="NestedSampler.consume_sample"><a class="viewcode-back" href="../../cpnest.html#cpnest.NestedSampling.NestedSampler.consume_sample">[docs]</a>    <span class="k">def</span> <span class="nf">consume_sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">queues</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="n">authkey</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        consumes a sample from the shared queues and updates the evidence</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Increment the state of the evidence integration</span>
+        <span class="n">logLmin</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">get_worst_live_point</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">increment</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">worst</span><span class="p">]</span><span class="o">.</span><span class="n">logL</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">condition</span> <span class="o">=</span> <span class="n">logaddexp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">logZ</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">logLmax</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">iteration</span><span class="o">/</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Nlive</span><span class="p">)))</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">logZ</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_sample</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">worst</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">iteration</span><span class="o">+=</span><span class="mi">1</span>
+        
+        <span class="c1"># Replace the point we just consumed with the next acceptable one</span>
+        <span class="k">while</span><span class="p">(</span><span class="kc">True</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">acceptance</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">jumps</span><span class="p">,</span><span class="n">proposed</span> <span class="o">=</span> <span class="n">queues</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">queue_counter</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">queue_counter</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">queue_counter</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">queues</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">proposed</span><span class="o">.</span><span class="n">logL</span><span class="o">&gt;</span><span class="bp">self</span><span class="o">.</span><span class="n">logLmin</span><span class="o">.</span><span class="n">value</span><span class="p">:</span>
+                <span class="c1"># replace worst point with new one</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">worst</span><span class="p">]</span><span class="o">=</span><span class="n">proposed</span>
+                <span class="k">break</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span><span class="p">:</span>
+          <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{0:d}</span><span class="s2">: n:</span><span class="si">{1:4d}</span><span class="s2"> acc:</span><span class="si">{2:.3f}</span><span class="s2"> H: </span><span class="si">{3:.2f}</span><span class="s2"> logL </span><span class="si">{4:.5f}</span><span class="s2"> --&gt; </span><span class="si">{5:.5f}</span><span class="s2"> dZ: </span><span class="si">{6:.3f}</span><span class="s2"> logZ: </span><span class="si">{7:.3f}</span><span class="s2"> logLmax: </span><span class="si">{8:.2f}</span><span class="s2">&quot;</span>\
+            <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">iteration</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jumps</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">acceptance</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">info</span><span class="p">,</span>\
+              <span class="n">logLmin</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">worst</span><span class="p">]</span><span class="o">.</span><span class="n">logL</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">condition</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">logZ</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">logLmax</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="NestedSampler.get_worst_live_point"><a class="viewcode-back" href="../../cpnest.html#cpnest.NestedSampling.NestedSampler.get_worst_live_point">[docs]</a>    <span class="k">def</span> <span class="nf">get_worst_live_point</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        selects the lowest likelihood live point</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">logL_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">p</span><span class="o">.</span><span class="n">logL</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">worst</span> <span class="o">=</span> <span class="n">logL_array</span><span class="o">.</span><span class="n">argmin</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logLmin</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">logL_array</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">worst</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logLmax</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">logL_array</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">float128</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">logLmin</span><span class="o">.</span><span class="n">value</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="NestedSampler.nested_sampling_loop"><a class="viewcode-back" href="../../cpnest.html#cpnest.NestedSampling.NestedSampler.nested_sampling_loop">[docs]</a>    <span class="k">def</span> <span class="nf">nested_sampling_loop</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">queues</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="n">authkey</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        main nested sampling loop</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Nlive</span><span class="p">):</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">acceptance</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">jumps</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">queues</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">queue_counter</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">queue_counter</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">queue_counter</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">queues</span><span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">logP</span><span class="o">!=-</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">logL</span><span class="o">!=-</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">:</span>
+                    <span class="k">break</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span><span class="p">:</span>
+              <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;sampling the prior --&gt; </span><span class="si">{0:.0f}</span><span class="s2"> </span><span class="si">% c</span><span class="s2">omplete</span><span class="se">\r</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">((</span><span class="mf">100.0</span><span class="o">*</span><span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Nlive</span><span class="p">))))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span><span class="p">:</span> <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_sampling</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Nlive</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">output_sample</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">evidence_out</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logLmin</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Nested Sampling process </span><span class="si">{0!s}</span><span class="s2">, exiting&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()))</span>
+            <span class="k">return</span> <span class="mi">0</span>
+        
+        <span class="n">logLmin</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_worst_live_point</span><span class="p">()</span>
+
+        <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">condition</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">tolerance</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">consume_sample</span><span class="p">(</span><span class="n">queues</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="n">authkey</span><span class="p">)</span>
+
+	<span class="c1"># Signal worker threads to exit</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logLmin</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span>
+
+        <span class="c1"># Flush the queue so subsequent join can succeed</span>
+        <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">queues</span><span class="p">:</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+              <span class="k">try</span><span class="p">:</span>
+                <span class="n">_</span> <span class="o">=</span> <span class="n">q</span><span class="o">.</span><span class="n">get_nowait</span><span class="p">()</span>
+              <span class="k">except</span> <span class="n">Empty</span><span class="p">:</span>
+                <span class="k">break</span>
+
+        <span class="c1"># final adjustments</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">attrgetter</span><span class="p">(</span><span class="s1">&#39;logL&#39;</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span><span class="n">p</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">increment</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">logL</span><span class="p">,</span><span class="n">nlive</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Nlive</span><span class="o">-</span><span class="n">i</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">output_sample</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+ 
+        <span class="c1"># Refine evidence estimate</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">finalise</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logZ</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">logZ</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">evidence_out</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:.5f}</span><span class="s1"> </span><span class="si">{1:.5f}</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">logZ</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">logLmax</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">evidence_out</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Final evidence: </span><span class="si">{0:0.2f}</span><span class="se">\n</span><span class="s1">Information: </span><span class="si">{1:.2f}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">logZ</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">info</span><span class="p">))</span>
+        
+        <span class="c1"># Some diagnostics</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span><span class="o">&gt;</span><span class="mi">1</span> <span class="p">:</span>
+          <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_folder</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">outfilename</span><span class="o">+</span><span class="s1">&#39;.png&#39;</span><span class="p">))</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">logZ</span></div></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, W. Del Pozzo, J. Veitch.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'0.1.4',
+            LANGUAGE:'None',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
