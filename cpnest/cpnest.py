@@ -147,6 +147,7 @@ class CPNest(object):
             signal.signal(signal.SIGTERM, sighandler)
             signal.signal(signal.SIGQUIT, sighandler)
             signal.signal(signal.SIGINT, sighandler)
+            signal.signal(signal.SIGUSR1, sighandler)
             signal.signal(signal.SIGUSR2, sighandler)
         
         #self.p_ns.start()
